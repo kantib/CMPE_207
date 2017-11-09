@@ -1,4 +1,5 @@
 import socket
+from random import randint
 
 ERROR = 'FAILED'
 SUCCESS = 'SUCCESS'
@@ -81,28 +82,120 @@ class Teller(object):
 
             if(choice == '1'):
                 # Access Customer account
-                print "calling opt 1 => access_cust_acct()"
+                print "calling opt 1 => Access_cust_acct()"
                 self.access_customer_account()
             elif(choice =='2'):
                 # Create Customer account
-                print "calling opt 2 => access_cust_acct()"
+                print "calling opt 2 => Create_cust_acct()"
                 self.create_customer_account()
             elif(choice == '3'):
                 # Delete Customer account
-                print "calling opt 3 => access_cust_acct()"
+                print "calling opt 3 => Delete_cust_acct()"
                 self.delete_customer_account()
             elif(choice == '4'):
                 # Logout
-                print "calling opt 4 => access_cust_acct()"
                 return LOGOUT
             else:
                 # Update Customer profile
                 print "Invalid choice"
 
+    def create_customer_account(self):
+        user_name = raw_input("User Name: ")
+        password = raw_input("Password: ")
+        customer_id = randint(1000000000, 9999999999)
+        print "Generated Customer id = " + customer_id
+        client_type = 'Customer'
+
+        req_obj = Request()
+        req_obj.reqType = 'INSERT'
+        req_obj.reqParams['client_type'] = self.cli_type
+        req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
+        req_obj.reqParams['user_name'] =  user_name
+        req_obj.reqParams['password'] = password
+        req_obj.reqParams['customer_id'] = customer_id
+        req_obj.reqParams['record_client_type'] = client_type
+
+        err = self.cli_obj.sock.sendall(req_obj.toString())
+        if err != None:
+            print" Send ERROR"
+            
+        print "Waiting for response.."
+        data = self.cli_obj.sock.recv(1024)
+
+        print "creating Response object"
+        res_obj = Response(data)
+
+        if(res_obj.resParams['status'] == 'SUCCESS'):
+            print "Customer login Created"
+            chk_acct_num = randint(100000000, 999999999)
+            sav_acct_num = randint(100000000, 999999999)
+
+            req_obj.reqType = 'INSERT'
+            req_obj.reqParams['client_type'] = self.cli_type
+            req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
+            req_obj.reqParams['customer_chk_acct'] =  chk_acct_num
+            req_obj.reqParams['customer_sav_acct'] = sav_acct_num
+            req_obj.reqParams['customer_id'] = customer_id
+            req_obj.reqParams['customer_chk_bal'] = 0
+            req_obj.reqParams['customer_sav_bal'] = 0
+
+            err = self.cli_obj.sock.sendall(req_obj.toString())
+            if err != None:
+                print" Send ERROR"
+
+            print "Waiting for response.."
+            data = self.cli_obj.sock.recv(1024)
+
+            print "creating Response object"
+            res_obj = Response(data)
+
+            if(res_obj.resParams['status'] == 'SUCCESS'):
+                print "Customer Accounts Created"
+
+                first_name = raw_input("First Name: ")
+                last_name = raw_input("Last_name: ")
+                dob = raw_input("Date Of Birth: ")
+                email = raw_input("Email: ")
+                phone_num = raw_input("Phone number: ")
+                address = raw_input("Address: ")
+
+                req_obj.reqType = 'INSERT'
+                req_obj.reqParams['client_type'] = self.cli_type
+                req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
+                req_obj.reqParams['first_name'] =  first_name
+                req_obj.reqParams['last_name'] = last_name
+                req_obj.reqParams['DOB'] = dob
+                req_obj.reqParams['email'] = email
+                req_obj.reqParams['phone'] = phone_num
+                req_obj.reqParams['address'] = address
+
+                err = self.cli_obj.sock.sendall(req_obj.toString())
+                if err != None:
+                    print" Send ERROR"
+
+                print "Waiting for response.."
+                data = self.cli_obj.sock.recv(1024)
+
+                print "creating Response object"
+                res_obj = Response(data)
+
+                if(res_obj.resParams['status'] == 'SUCCESS'):
+                    print "Customer Profile Created"
+
+                else:
+                    print "Create Failed - Error: "+ res_obj+resParams['err']
+                    # Send Delete request to delete the corresponding entries
+                    # in customer_login and ACCOUNT_TABLE table
+            else:
+                print"Create Failed - Error: "+res_obj.resParams['err']
+                # Delete Corresponding entry in the Customer login here
+        else:
+            print "Create Failed - Error: " + res_obj.resParams['err']
+
     def access_customer_account(self):
         while True:
-            print "1. View/Manage User accounts"
-            print "2. View/Manage User profile"
+            print "1. View / Manage User accounts"
+            print "2. View / Manage User profile"
             print "3. Exit Menu"
 
             choice = raw_input("choice -> ")

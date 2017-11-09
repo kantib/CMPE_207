@@ -321,31 +321,31 @@ class Client(threading.Thread):
 
     def update_customer_profile(self,req):
         if 'customer_id' not in req.reqParams or \
-                req.reqParams['customer_id'] == "" or \
-                'first_name' not in req.reqParams or \
-                'last_name' not in req.reqParams or \
-                'DOB' not in req.reqParams or \
-                'email' not in req.reqParams or \
-                'phone' not in req.reqParams or \
-                'address' not in req.reqParams:
+                req.reqParams['customer_id'] == "":
+                #'first_name' not in req.reqParams or \
+                #'last_name' not in req.reqParams or \
+                #'DOB' not in req.reqParams or \
+                #'email' not in req.reqParams or \
+                #'phone' not in req.reqParams or \
+                #'address' not in req.reqParams:
             self.send_error('UPDATE_RESPONSE','Multiple Invalid key-value entries')
             return ERROR
-        if req.reqParams['first_name'] != '':
+        if 'first_name' in req.reqParams and req.reqParams['first_name'] != '':
             fname = 'FIRST_NAME'
             fname_val = req.reqParams['first_name']
-        if req.reqParams['last_name'] != '':
+        if 'last_name' in req.reqParams and req.reqParams['last_name'] != '':
             lname = 'LAST_NAME'
-            lname_val = req.reqParams['first_name']
-        if req.reqParams['DOB'] != '':
+            lname_val = req.reqParams['last_name']
+        if 'DOB' in req.reqParams and req.reqParams['DOB'] != '':
             dob = 'DATE_OF_BIRTH'
             dob_val = req.reqParams['DOB']
-        if req.reqParams['email'] != '':
+        if 'email' in req.reqParams and req.reqParams['email'] != '':
             emial = 'EMAIL_ID'
             emial_val = req.reqParams['email']
-        if req.reqParams['phone'] != '':
+        if 'phone' in req.reqParams and req.reqParams['phone'] != '':
             phone = 'PHONE_NUMBER'
             phone_val = req.reqParams['phone']
-        if req.reqParams[''] != '':
+        if 'address' in req.reqParams and req.reqParams[''] != '':
             address = 'ADDRESS'
             address_val = req.reqParams['address']
         sql = "UPDATE CUSTOMER_INFO_TABLE SET '{a}' = '{b}' WHERE SAVING_ACCOUNT_NUM ='{y}'".format(x=bal, y=acct)
