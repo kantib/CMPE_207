@@ -82,15 +82,15 @@ class Teller(object):
 
             if(choice == '1'):
                 # Access Customer account
-                print "calling opt 1 => Access_cust_acct()"
+                print "calling opt 1 => Access_cust_acct"
                 self.access_customer_account()
-            elif(choice =='2'):
+            elif(choice == '2'):
                 # Create Customer account
-                print "calling opt 2 => Create_cust_acct()"
+                print "calling opt 2 => Create_cust_acct"
                 self.create_customer_account()
             elif(choice == '3'):
                 # Delete Customer account
-                print "calling opt 3 => Delete_cust_acct()"
+                print "calling opt 3 => Delete_cust_acct"
                 self.delete_customer_account()
             elif(choice == '4'):
                 # Logout
@@ -99,17 +99,88 @@ class Teller(object):
                 # Update Customer profile
                 print "Invalid choice"
 
+
+    def delete_customer_account(self):
+        customer_id = raw_input("Enter customer id: ")
+
+        req_obj = Request()
+        req_obj.reqType = 'DELETE'
+        req_obj.reqParams['client_type'] = self.cli_type
+        req_obj.reqParams['subreq_type'] = 'DELETE_LOGIN_RECORD'
+        req_obj.reqParams['customer_id'] = customer_id
+
+        err = self.cli_obj.sock.sendall(req_obj.toString())
+        if err != None:
+            print" Send ERROR"
+            
+        print "Waiting for response.."
+        data = self.cli_obj.sock.recv(1024)
+
+        print "creating Response object"
+        res_obj = Response(data)
+
+        if(res_obj.resParams['status'] == 'SUCCESS'):
+            print "Customer login Deleted"
+
+            req_obj.reqType = 'DELETE'
+            req_obj.reqParams['client_type'] = self.cli_type
+            req_obj.reqParams['subreq_type'] = 'DELETE_ACCT_RECORD'
+            req_obj.reqParams['customer_id'] = customer_id
+
+            err = self.cli_obj.sock.sendall(req_obj.toString())
+            if err != None:
+                print" Send ERROR"
+
+            print "Waiting for response.."
+            data = self.cli_obj.sock.recv(1024)
+
+            print "creating Response object"
+            res_obj = Response(data)
+
+            if(res_obj.resParams['status'] == 'SUCCESS'):
+                print "Customer Account Deleted"
+
+                req_obj.reqType = 'DELETE'
+                req_obj.reqParams['client_type'] = self.cli_type
+                req_obj.reqParams['subreq_type'] = 'DELETE_PROFILE_RECORD'
+                req_obj.reqParams['customer_id'] = customer_id
+
+                err = self.cli_obj.sock.sendall(req_obj.toString())
+                if err != None:
+                    print" Send ERROR"
+
+                print "Waiting for response.."
+                data = self.cli_obj.sock.recv(1024)
+
+                print "creating Response object"
+                res_obj = Response(data)
+
+                if(res_obj.resParams['status'] == 'SUCCESS'):
+                    print "Customer Profile Deleted"
+
+                else:
+                    print "Create Failed - Error: "+ res_obj+resParams['err']
+                    # Send Delete request to delete the corresponding entries
+                    # in customer_login and ACCOUNT_TABLE table
+            else:
+                print"Create Failed - Error: "+res_obj.resParams['err']
+                # Delete Corresponding entry in the Customer login here
+        else:
+            print "Create Failed - Error: " + res_obj.resParams['err']
+
+
     def create_customer_account(self):
+        print "Inside create_customer_account"
         user_name = raw_input("User Name: ")
         password = raw_input("Password: ")
-        customer_id = randint(1000000000, 9999999999)
-        print "Generated Customer id = " + customer_id
+        customer_id = randint(1000000000, 2147483648)
+        print "Generated Customer id = " + str(customer_id)
         client_type = 'Customer'
 
         req_obj = Request()
         req_obj.reqType = 'INSERT'
         req_obj.reqParams['client_type'] = self.cli_type
-        req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
+        req_obj.reqParams['subreq_type'] = 'INSERT_LOGIN_RECORD'
         req_obj.reqParams['user_name'] =  user_name
         req_obj.reqParams['password'] = password
         req_obj.reqParams['customer_id'] = customer_id
@@ -127,13 +198,13 @@ class Teller(object):
 
         if(res_obj.resParams['status'] == 'SUCCESS'):
             print "Customer login Created"
-            chk_acct_num = randint(100000000, 999999999)
-            sav_acct_num = randint(100000000, 999999999)
+            chk_acct_num = randint(100000000, 2147483648)
+            sav_acct_num = randint(100000000, 2147483648)
 
             req_obj.reqType = 'INSERT'
             req_obj.reqParams['client_type'] = self.cli_type
-            req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
-            req_obj.reqParams['customer_chk_acct'] =  chk_acct_num
+            req_obj.reqParams['subreq_type'] = 'INSERT_ACCT_RECORD'
+            req_obj.reqParams['customer_chk_acct'] = chk_acct_num
             req_obj.reqParams['customer_sav_acct'] = sav_acct_num
             req_obj.reqParams['customer_id'] = customer_id
             req_obj.reqParams['customer_chk_bal'] = 0
@@ -161,7 +232,7 @@ class Teller(object):
 
                 req_obj.reqType = 'INSERT'
                 req_obj.reqParams['client_type'] = self.cli_type
-                req_obj.reqParams['subreq_type'] = 'CUST_RECORD'
+                req_obj.reqParams['subreq_type'] = 'INSERT_PROFILE_RECORD'
                 req_obj.reqParams['first_name'] =  first_name
                 req_obj.reqParams['last_name'] = last_name
                 req_obj.reqParams['DOB'] = dob
@@ -462,15 +533,6 @@ class Teller(object):
         else:
             print "Update failure: Customer account could not be updated at this time"
 
-
-    def create_customer_account(self):
-        pass
-
-    def delete_customer_account(self):
-        pass
-
-    def logout(self):
-        pass
 
 class Admin(object):
     def __init__(self, cli_obj, cli_id):
