@@ -1,3 +1,4 @@
+import time
 import socket
 import threading
 import MySQLdb
@@ -128,12 +129,15 @@ class Client(threading.Thread):
                 return SUCCESS
 
     def service_get_request(self, req):
+        print"called service_get_request()\n"
         resp = Response()
 
         if req.reqParams['subreq_type'] == 'CUSTOMER_ID':
             self.get_customer_id(req)
         elif req.reqParams['subreq_type'] == 'CUSTOMER_ACCT':
             self.get_customer_acct(req)
+        elif req.reqParams['subreq_type'] == 'CUSTOMER_TRANSACTION':
+            self.get_customer_transactions(req)
         elif req.reqParams['subreq_type'] == 'CUSTOMER_PROFILE':
             self.get_customer_profile(req)
         else:
@@ -142,6 +146,7 @@ class Client(threading.Thread):
 
 
     def service_set_request(self, req):
+        print"called service_set_request()"
         if req.reqParams['subreq_type'] == 'UPDATE_CHK_ACCT':
             self.update_customer_acct(req)
 
@@ -156,6 +161,7 @@ class Client(threading.Thread):
             return ERROR
 
     def service_insert_request(self, req):
+        print"called service_insert_request()"
         if req.reqParams['subreq_type'] == 'INSERT_LOGIN_RECORD':
             self.insert_login_record(req)
         elif req.reqParams['subreq_type'] == 'INSERT_ACCT_RECORD':
@@ -168,6 +174,7 @@ class Client(threading.Thread):
 
 
     def service_delete_request(self, req):
+        print "service_delete_request()"
         if req.reqParams['subreq_type'] == 'DELETE_LOGIN_RECORD':
             self.delete_login_record(req)
         elif req.reqParams['subreq_type'] == 'DELETE_ACCT_RECORD':
@@ -181,6 +188,7 @@ class Client(threading.Thread):
     ###########################  GET FUNCTIONS  ############################
 
     def get_customer_profile(self, req):
+        print "called get_customer_profile()"
         if "customer_id" not in req.reqParams or \
                 req.reqParams["customer_id"] == "" :
             self.send_error('GET_RESPONSE','Invalid Customer ID')
@@ -199,11 +207,12 @@ class Client(threading.Thread):
             # fetch results (its a list)
             results = self.cursor.fetchone()
             if not results:
-                #print "get request failure:Record does not exist"
+                #print "get_customer_profile():Request failure-Record does not exist"
                 self.send_error('GET_RESPONSE','Record does not exist')
                 return ERROR
             else:
-                #print str(results[0])+","+results[1]+","+results[2]+","+results[3]+","+results[4]+","+results[5]+","+results[6]
+                #print str(results[0])+","+results[1]+","+results[2]+","+results[3]+ \
+                        #","+results[4]+","+results[5]+","+results[6]
                 
                 resp.resType = 'GET_RESPONSE'
                 resp.resParams['status']='SUCCESS'
@@ -219,13 +228,15 @@ class Client(threading.Thread):
 
 
     def get_customer_id(self, req):
+        print"called get_customer_id()"
         if "customer_name" not in req.reqParams or \
                 req.reqParams["customer_name"] == "" :
             self.send_error('GET_RESPONSE','Invalid Username or password')
             return ERROR
         else: 
             resp = Response()
-            sql = "SELECT * from customer_login WHERE USERNAME='{x}'".format(x=req.reqParams["customer_name"]) 
+            sql = "SELECT * from customer_login WHERE USERNAME='{x}'".format\
+                    (x=req.reqParams["customer_name"]) 
             #print "sql query ==> " + sql
             try:
                 self.cursor.execute(sql)
@@ -238,7 +249,7 @@ class Client(threading.Thread):
             # fetch results (its a list)
             results = self.cursor.fetchone()
             if not results:
-                print "get request failure:Record does not exist"
+                print "get_customer_id:Request failure-Record does not exist"
                 self.send_error('GET_RESPONSE','Record does not exist')
                 return ERROR
             else:
@@ -250,6 +261,7 @@ class Client(threading.Thread):
                 return SUCCESS
 
     def get_customer_chk_acct(self,customer_id):
+        print"called get_customer_chk_acct()"
         sql = "SELECT * from ACCOUNT_TABLE WHERE CUSTOMER_ID='{x}'".format(x=customer_id) 
         #print "sql query ==> " + sql
         try:
@@ -266,6 +278,7 @@ class Client(threading.Thread):
             return results[1], results[3]
 
     def get_customer_sav_acct(self,customer_id):
+        print "called get_customer_sav_acct()"
         sql = "SELECT * from ACCOUNT_TABLE WHERE CUSTOMER_ID='{x}'".format(x=customer_id) 
         #print "sql query ==> " + sql
         try:
@@ -283,6 +296,7 @@ class Client(threading.Thread):
 
 
     def get_customer_acct(self, req):
+        print"called get_customer_acct()"
         if "customer_id" not in req.reqParams or \
                 req.reqParams["customer_id"] == "":
             self.send_error('GET_RESPONSE','Invalid key-value entries for customer_id')
@@ -309,9 +323,64 @@ class Client(threading.Thread):
                 self.sock.send(resp.toString())
                 return SUCCESS
 
+    def get_customer_transactions(self, req):
+        if "customer_id" not in req.reqParams or \
+                req.reqParams["customer_id"] == "":
+            self.send_error('GET_RESPONSE','Invalid key-value entries for customer_id')
+            return ERROR
+        else: 
+
+            chk_acct_num, chk_acct_bal = self.get_customer_chk_acct(req.reqParams['customer_id'])
+            sav_acct_num, sav_acct_bal = self.get_customer_sav_acct(req.reqParams['customer_id'])
+
+            if chk_acct_num == '' or chk_acct_bal == '' or \
+                    sav_acct_num == '' or sav_acct_num == '':
+                #print "Failed to GET Records"
+                self.send_error('GET_RESPONSE','Get operation failed')
+                return  ERROR
+            else:
+                resp = Response()
+                resp.resType = 'GET_RESPONSE'
+                resp.resParams['status']='SUCCESS'
+                resp.resParams['customer_id'] = req.reqParams['customer_id']
+                resp.resParams['chk_acct'] = chk_acct_num
+                resp.resParams['chk_bal'] = chk_acct_bal
+                resp.resParams['sav_acct'] = sav_acct_num
+                resp.resParams['sav_bal'] = sav_acct_bal
+                self.sock.send(resp.toString())
+                return SUCCESS
+
+
+    def get_transaction_record(self, customer_id):
+        print"called get_transaction_record()"
+        sql = "SELECT * from TRANSACTION_TABLE WHERE CUSTOMER_ID='{x}'".format(x=customer_id) 
+        print "sql query ==> " + sql
+        try:
+            self.cursor.execute(sql)
+        except Exception as e:
+            print e
+            return ERROR
+
+        # fetch results (its a list)
+        results = self.cursor.fetchone()
+        print "*********************************"
+        print results
+        print "*********************************"
+        if not results:
+            print "get_transaction_record():Request failure - Record does not exist"
+            return results
+        else:
+            #print str(results[0])+","+str(results[1])+","+str(results[2])+","  \
+             #       +str(results[3])+","+str(results[4])+","+str(results[5])+","+str(results[6])    
+            print "get_transaction_record(): results = "
+            print results
+            print "returning from get_transaction_record()"
+            return results
+
     #################################  UPDATE FUNCTIONS  ###############################
 
     def update_customer_acct(self, req):
+        print"called update_customer_acct()"
         if 'customer_id' not in req.reqParams or \
                 req.reqParams['customer_id'] == "" or \
                 'chk_acct_num' not in req.reqParams or \
@@ -331,28 +400,32 @@ class Client(threading.Thread):
             acct, bal = self.get_customer_sav_acct(req.reqParams['customer_id'])
         bal = float(bal)
         if(req.reqParams['op_type'] == 'SUBTRACT'):
+            trns_type = 'WITHDRAW'
             bal = bal - amt
             if bal < 10:
                 # send update failure
                 self.send_error('UPDATE_RESPONSE', 'Minimum balance should be $10')
                 return ERROR
         elif(req.reqParams['op_type'] == 'ADD'):
+            trns_type = 'DEPOSIT'
             bal = bal + amt
         else:
             self.send_error('UPDATE_RESPONSE', 'Unknown operation type sent')
             return ERROR
     
         if req.reqParams['subreq_type'] == 'UPDATE_CHK_ACCT':
+            acct_type = 'CHECKING'
             sql = "UPDATE ACCOUNT_TABLE SET CHECKING_ACCOUNT_BAL = '{x}' WHERE CHECKING_ACCOUNT_NUM ='{y}'".format(x=bal, y=acct)
         else:
+            acct_type = 'SAVING'
             sql = "UPDATE ACCOUNT_TABLE SET SAVING_ACCOUNT_BAL = '{x}' WHERE SAVING_ACCOUNT_NUM ='{y}'".format(x=bal, y=acct)
-        #print "sql query ==> " + sql
+        print "sql query ==> " + sql
         try:
             self.cursor.execute(sql)
             self.db.commit()
         except Exception as e:
             print e
-            #print "UPDATE request failure: server side error"
+            print "UPDATE request failure: server side error"
             self.db.rollback()
             self.send_error('UPDATE_RESPONSE', 'Server error: DB operation could not be completed')
             return ERROR
@@ -361,9 +434,12 @@ class Client(threading.Thread):
         resp.resType = 'UPDATE_RESPONSE'
         resp.resParams['status']='SUCCESS'
         self.sock.send(resp.toString())
-        return SUCCESS
+        print"User ACCOUNT record updated successfully"
+        status = self.update_transactions(req.reqParams['customer_id'],trns_type,acct_type,amt)
+        return status
 
     def update_customer_profile(self,req):
+        print"called update_customer_profile()"
         if 'customer_id' not in req.reqParams or \
                 req.reqParams['customer_id'] == "":
             self.send_error('UPDATE_RESPONSE','Multiple Invalid key-value entries')
@@ -409,9 +485,59 @@ class Client(threading.Thread):
         self.sock.send(resp.toString())
         return SUCCESS
 
+    def update_transactions(self, customer_id, trns_type, acct_type, amount):
+        print"called update_transactions()"
+        cur_date = time.strftime("%d/%m/%Y")
+        cur_time = time.strftime("%X")
+        # Transaction record format: 
+        # < Transaction type:amount:date:time:FromAccount:ToAccount:Bank >
+        current_trns = trns_type+"|"+acct_type+"|"+str(amount)+"|"+str(cur_date)+"|"+str(cur_time)+"|"+""+"|"+""+"|"+""
+        print "current_trns = " + current_trns
+        trns_tuple = self.get_transaction_record(customer_id)
+        if(trns_tuple != None):
+            trns_list =  list(trns_tuple)
+            trns_list = trns_list[1:]
+            trns_list = [current_trns] + trns_list
+            print"---------------------------------------------------------------------------------"
+            print "\nupdate_transactions() after pop: trns_list = "
+            print trns_list
+            print"---------------------------------------------------------------------------------\n"
+            trns_list.pop(10)
+            not_first_record = True
+        else:
+            trns_list = [current_trns] + ['','','','','','','','','',]
+            not_first_record = False
+        print"---------------------------------------------------------------------------------"
+        print "update_transactions(): trns_list = "
+        print trns_list
+        print"---------------------------------------------------------------------------------"
+        
+        status = self.update_transaction_table(customer_id, trns_list, not_first_record)
+        return status
+
+    def update_transaction_table(self, customer_id, trns_list, not_first_record):
+        print"called update_transaction_table()"
+        if(not_first_record):
+            status = self.delete_transaction_record(customer_id)
+            if(status == ERROR):
+                print"Failed to delete user transaction record"
+                return status
+            else:
+                status = self.insert_transaction_record(customer_id, trns_list)
+                if(status == ERROR):
+                    print"Failed to insert user transaction record"
+                return status
+        else:
+            status = self.insert_transaction_record(customer_id, trns_list)
+            if(status == ERROR):
+                print"Failed to insert user transaction record"
+            return status
+        
+
     ##################################  INSERT FUNCTIONS  ####################################
 
     def insert_login_record(self, req):
+        print"called insert_login_record()"
         if 'user_name' not in req.reqParams or \
                 'password' not in req.reqParams or \
                 'customer_id' not in req.reqParams or \
@@ -445,6 +571,7 @@ class Client(threading.Thread):
         return SUCCESS
 
     def insert_accounts_record(self, req):
+        print"called insert_accounts_record()"
         if 'customer_id' not in req.reqParams or \
                 'customer_chk_acct' not in req.reqParams or \
                 'customer_sav_acct' not in req.reqParams or \
@@ -481,6 +608,7 @@ class Client(threading.Thread):
         return SUCCESS
 
     def insert_profile_record(self, req):
+        print "called insert_profile_record()"
         if 'customer_id' not in req.reqParams or \
                 'first_name' not in req.reqParams or \
                 'last_name' not in req.reqParams or \
@@ -521,9 +649,33 @@ class Client(threading.Thread):
         self.sock.send(resp.toString())
         return SUCCESS
 
+    def insert_transaction_record(self,customer_id, trns_list):
+        print"called insert_transaction_record()"
+        sql = "INSERT INTO TRANSACTION_TABLE (CUSTOMER_ID, TRNS_1,TRNS_2,TRNS_3,TRNS_4,TRNS_5, \
+                TRNS_6,TRNS_7,TRNS_8,TRNS_9,TRNS_10) VALUES('{a}','{b}','{c}','{d}','{e}','{f}', \
+                '{g}','{h}','{i}','{j}','{k}')".format(a=customer_id,b=trns_list[0],c=trns_list[1],d=trns_list[2], \
+                e=trns_list[3],f=trns_list[4],g=trns_list[5],h=trns_list[6],i=trns_list[7], \
+                j=trns_list[8],k=trns_list[9])
+        print"-----------------------------------------------------------------------------------"
+        print "\nsql -> "+sql
+        print"-----------------------------------------------------------------------------------"
+        
+        try:
+            self.cursor.execute(sql)
+            self.db.commit()
+        except Exception as e:
+            print e
+            #print "INSERT request failure: server side error"
+            self.db.rollback()
+            return ERROR
+        
+        print " Transaction record inserted successfully"
+        return SUCCESS
+
     #################################   DELETE FUNCTIONS  ################################
 
     def delete_login_record(self, req):
+        print"called delete_login_record()"
         if "customer_id" not in req.reqParams or \
                 req.reqParams["customer_id"] == "" :
             self.send_error('DELETE_RESPONSE','Invalid Customer ID')
@@ -531,7 +683,7 @@ class Client(threading.Thread):
         
         sql = "DELETE FROM customer_login WHERE CUSTOMER_ID='{a}'".format \
                 (a=req.reqParams['customer_id'])
-        print "sql -> "+sql
+        #print "sql -> "+sql
 
         try:
             self.cursor.execute(sql)
@@ -551,6 +703,7 @@ class Client(threading.Thread):
 
 
     def delete_accounts_record(self, req):
+        print"called delete_accounts_record()"
         if "customer_id" not in req.reqParams or \
                 req.reqParams["customer_id"] == "" :
             self.send_error('DELETE_RESPONSE','Invalid Customer ID')
@@ -576,6 +729,7 @@ class Client(threading.Thread):
         return SUCCESS
 
     def delete_profile_record(self, req):
+        print"delete_profile_record()"
         if "customer_id" not in req.reqParams or \
                 req.reqParams["customer_id"] == "" :
             self.send_error('DELETE_RESPONSE','Invalid Customer ID')
@@ -601,23 +755,40 @@ class Client(threading.Thread):
         self.sock.send(resp.toString())
         return SUCCESS
 
+    def delete_transaction_record(self, customer_id):
+        print"called delete_transaction_record()"
+        sql = "DELETE FROM TRANSACTION_TABLE WHERE CUSTOMER_ID='{a}'".format(a=customer_id)
+        #print "sql -> "+sql
 
+        try:
+            self.cursor.execute(sql)
+            self.db.commit()
+        except Exception as e:
+            print e
+            #print "DELETE request failure: server side error"
+            self.db.rollback()
+            return ERROR
+        
+        print"delete_transaction_record(): Record deleted successfully"
+        return SUCCESS
 
 #########################  SERVER CLASS #########################  
     
-class Server(object):
-    def __init__(self, host, port):
+class Server(threading.Thread):
+    def __init__(self, family, host, port):
         # store input values for future reference
+        threading.Thread.__init__(self)
         self.host = host
         self.port = port
         self.clientThreads = []
 
         # create new server socket and bind to host:port
-        self.ssock = socket.socket()
-        self.ssock.bind((host, port))
+        self.ssock = socket.socket(family)
+    #    self.ssock.setsockopt(socket.SOL_SOCKET, socket.IPV6_V6ONLY, 0)
+        self.ssock.bind((self.ssock.getsockname()[0], port))
         self.ssock.listen(5)
 
-    def serve(self):
+    def run(self):
         while True:
             print "Server Listening for Clients.."
 
@@ -635,8 +806,14 @@ def main():
     port = 5500
 
     # Create DataBase object
-    server = Server(host, port)
-    server.serve()
+#    server = Server(socket.AF_INET, "0.0.0.0", port)
+#    server.start()
+
+    server = Server(socket.AF_INET6, "::", port)
+    server.start()
+
+    while True:
+        time.sleep(10)
 
 if __name__=='__main__':
     main()

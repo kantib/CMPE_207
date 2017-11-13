@@ -101,18 +101,69 @@ class Teller(object):
 
 
     def access_customer_account(self):
+        
+        #if _flag:
+        customer_name = raw_input("Login Name: -> ")
+        customer_id = 0
+        customer_id = self.get_customer_id(customer_name)
+        #else:
+            #customer_id = self.temp_cust_id
+            #customer_name = self.temp_cust_name
+        if customer_id:
+            self.temp_cust_name = customer_name
+            self.temp_cust_id = customer_id
         while True:
-            print "1. View / Manage User accounts"
-            print "2. View / Manage User profile"
+            print "1. Manage customer accounts"
+            print "2. Manage customer profile"
             print "3. Exit Menu"
 
             choice = raw_input("choice -> ")
             if (choice == '1'):
-                self.view_customer_accounts(True)
+                self.manage_customer_accounts()
             elif(choice == '2'):
-                self.view_customer_profile(True)
+                self.manage_customer_profile()
             elif(choice == '3'):
                 return
+
+    def manage_customer_accounts(self):
+        while True:
+            print "1. View customer account"
+            print "2. View customer Transactions"
+            print "3. Update customer Checking account"
+            print "4. Update customer Saving account"
+            print "5. Exit"
+
+            choice = raw_input("choice -> ")
+            if (choice == '1'):
+                self.view_customer_accounts('1')
+            elif(choice == '2'):
+                self.view_customer_transactions()
+            elif(choice == '3'):
+                self.update_acct('checking')
+            elif(choice == '4'):
+                self.update_acct('saving')
+            elif(choice == '5'):
+                return
+            else:
+                print "Invalid choice. Enter again"
+
+
+    def manage_customer_profile(self):
+        while True:
+            print "1. View customer profile"
+            print "2. Update customer profile"
+            print "3. Exit"
+
+            choice = raw_input("choice -> ")
+            if (choice == '1'):
+                self.view_customer_profile()
+            elif(choice == '2'):
+                self.update_customer_profile()
+            elif(choice == '3'):
+                return
+            else:
+                print "Invalid choice. Enter again"
+
 
     def get_customer_id(self, customer_name):    
         # create request object
@@ -138,86 +189,63 @@ class Teller(object):
             print "GET :operation failed"
 
 
-    def view_customer_accounts(self,_flag):
-        if _flag:
-            customer_name = raw_input("Login Name: -> ")
-            customer_id = 0
-            customer_id = self.get_customer_id(customer_name)
-        else:
-            customer_id = self.temp_cust_id
-            customer_name = self.temp_cust_name
-        if customer_id:
-            self.temp_cust_name = customer_name
-            self.temp_cust_id = customer_id
+    def view_customer_accounts(self, display_flag):
 
-            # create request object
-            req_obj = Request()
-            req_obj.reqType = 'GET'
-            req_obj.reqParams['client_type'] = self.cli_type
-            req_obj.reqParams['subreq_type'] = 'CUSTOMER_ACCT'
-            req_obj.reqParams['customer_id'] = customer_id
+        # create request object
+        req_obj = Request()
+        req_obj.reqType = 'GET'
+        req_obj.reqParams['client_type'] = self.cli_type
+        req_obj.reqParams['subreq_type'] = 'CUSTOMER_ACCT'
+        req_obj.reqParams['customer_id'] = self.temp_cust_id
 
-            #print"sending GET Acct request.."
-            err = self.cli_obj.sock.sendall(req_obj.toString())
-            if err != None:
-                print" Send ERROR"
-            
-            #print "Waiting for response.."
-            data = self.cli_obj.sock.recv(1024)
+        #print"sending GET Acct request.."
+        err = self.cli_obj.sock.sendall(req_obj.toString())
+        if err != None:
+            print" Send ERROR"
+        
+        #print "Waiting for response.."
+        data = self.cli_obj.sock.recv(1024)
 
-            #print "creating Response object"
-            res_obj = Response(data)
+        #print "creating Response object"
+        res_obj = Response(data)
 
-            if(res_obj.resParams['status'] == 'SUCCESS'):
-                self.temp_cust_chk_acct = res_obj.resParams['chk_acct']
-                self.temp_cust_chk_bal = res_obj.resParams['chk_bal']
-                self.temp_cust_sav_acct = res_obj.resParams['sav_acct']
-                self.temp_cust_sav_bal = res_obj.resParams['sav_bal']
-
+        if(res_obj.resParams['status'] == 'SUCCESS'):
+            self.temp_cust_chk_acct = res_obj.resParams['chk_acct']
+            self.temp_cust_chk_bal = res_obj.resParams['chk_bal']
+            self.temp_cust_sav_acct = res_obj.resParams['sav_acct']
+            self.temp_cust_sav_bal = res_obj.resParams['sav_bal']
+            if(display_flag == '1'):
                 print"------------------------------------------------"
-                print "Name: "+customer_name+"     "+"Customer ID: "+customer_id+"\n"
+                print "Name: "+self.temp_cust_name+"     "+"Customer ID: "+self.temp_cust_id+"\n"
                 print "Checking Account               Balance     "
                 print res_obj.resParams['chk_acct']+ "                      $" + res_obj.resParams['chk_bal']+"\n"
                 print "Saving Account                 Balance "
                 print res_obj.resParams['sav_acct']+"                      $"+ res_obj.resParams['sav_bal']
                 print"------------------------------------------------\n"
-                print" 1. Update User Checking Account"
-                print" 2. Update User Saving Account"
-                print" 3. Exit"
-
-                while True:
-                    choice = raw_input("Enter Choice: ->")
-                    if choice >= '1' and choice <= '3':
-                        break
-                if choice == '1':
-                    self.update_acct('checking')
-                elif choice == '2':
-                    self.update_acct('saving')
-                else:
-                    return
+            elif(display_flag == '2'):
+                print"------------------------------------------------"
+                print "Name: "+self.temp_cust_name+"     "+"Customer ID: "+self.temp_cust_id+"\n"
+                print "Checking Account               Balance     "
+                print res_obj.resParams['chk_acct']+ "                      $" + res_obj.resParams['chk_bal']+"\n"
+                print"------------------------------------------------\n"
             else:
-                print "GET :operation failed"
+                print"------------------------------------------------"
+                print "Name: "+self.temp_cust_name+"     "+"Customer ID: "+self.temp_cust_id+"\n"
+                print "Saving Account               Balance     "
+                print res_obj.resParams['sav_acct']+ "                      $" + res_obj.resParams['sav_bal']+"\n"
+                print"------------------------------------------------\n"
         else:
-            print "Invalid Customer ID"
+            print "GET :operation failed"
 
 
-    def view_customer_profile(self,_flag):
-        if _flag:
-
-            customer_name = raw_input("Login Name: -> ")
-            customer_id = 0
-            customer_id = self.get_customer_id(customer_name)
-            self.temp_cust_id = customer_id
-            self.temp_cust_name = customer_name
-        else:
-            customer_id = self.temp_cust_id
+    def view_customer_profile(self):
 
         # create request object
         req_obj = Request()
         req_obj.reqType = 'GET'
         req_obj.reqParams['client_type'] = self.cli_type
         req_obj.reqParams['subreq_type'] = 'CUSTOMER_PROFILE'
-        req_obj.reqParams['customer_id'] = customer_id
+        req_obj.reqParams['customer_id'] = self.temp_customer_id
 
         #print"sending GET Acct request.."
         err = self.cli_obj.sock.sendall(req_obj.toString())
@@ -237,20 +265,42 @@ class Teller(object):
             print"Address      : "+res_obj.resParams['address']
             print"---------------------------------------------\n"
 
-            while True:
-                print"1. Update User profile"
-                print"2. Exit"
-                choice = raw_input('Enter Choice: ->')
-                if choice >= '1' and choice <= '2':
-                    break
-            if choice == '2':
-                return
-            else:
-                self.update_customer_profile()
 
 
+    def view_customer_transactions(self, customer_id):
+        
+        # create request object
+        req_obj = Request()
+        req_obj.reqType = 'GET'
+        req_obj.reqParams['client_type'] = self.cli_type
+        req_obj.reqParams['subreq_type'] = 'CUSTOMER_TRANSACTION'
+        req_obj.reqParams['customer_id'] = self.temp_customer_id
+
+        #print"sending GET Acct request.."
+        err = self.cli_obj.sock.sendall(req_obj.toString())
+        if err != None:
+            print" Send ERROR"
+            
+        data = self.cli_obj.sock.recv(1024)
+        res_obj = Response(data)
+        if(res_obj.resParams['status'] == 'SUCCESS'):
+            print"\n---------------------------------------------"
+            print"Customer ID  : "+res_obj.resParams['customer_id']
+            print"First Name   : "+res_obj.resParams['first_name']
+            print"Last Name    : "+res_obj.resParams['last_name']     
+            print"Date of Birth: "+res_obj.resParams['DOB']
+            print"Email Address: "+res_obj.resParams['email']
+            print"Phone Number : "+res_obj.resParams['phone']
+            print"Address      : "+res_obj.resParams['address']
+            print"---------------------------------------------\n"
 
     def update_acct(self,acct_type):
+        if (self.temp_cust_chk_acct == '' and self.temp_cust_sav_acct == ''):
+            if acct_type == 'checking':
+                self.view_customer_accounts('2')
+            elif acct_type == 'saving':
+                self.view_customer_accounts('3')
+
         while True:
             print"1. Withdrawal"
             print"2. Deposit"
@@ -266,6 +316,7 @@ class Teller(object):
         if(choice =='1' or choice == '2'):
             while True:
                 balance = raw_input("Amount -> ")
+                balance = float(balance)
                 if balance != '':
                     break
                 else:
@@ -303,7 +354,10 @@ class Teller(object):
 
         if(res_obj.resParams['status'] == 'SUCCESS'):
             print "Customer account updated successfully. New balance =>"
-            self.view_customer_accounts(False)
+            if acct_type == 'checking':
+                self.view_customer_accounts('2')
+            elif acct_type == 'saving':
+                self.view_customer_accounts('3')
         else:
             print "Update failure: Customer account could not be updated at this time"
 
@@ -330,7 +384,12 @@ class Teller(object):
         choice = raw_input("Address? ")
         if choice == 'Y' or choice == 'y':
             address = raw_input("Enter New Address: ")
-                        
+                       
+        if (first_name == '' and last_name == '' and dob == '' \
+                and email_id == '' and phone_num == '' and address == ''):
+            print"No changes opted."
+            return
+
         # create request object
         req_obj = Request()
         req_obj.reqType = 'SET'
@@ -364,7 +423,7 @@ class Teller(object):
 
         if(res_obj.resParams['status'] == 'SUCCESS'):
             print "Customer account updated successfully."
-            self.view_customer_profile(False)
+            self.view_customer_profile()
         else:
             print "Update failure: Customer account could not be updated at this time"
 
@@ -423,12 +482,18 @@ class Teller(object):
             if(res_obj.resParams['status'] == 'SUCCESS'):
                 print "Customer Accounts Created"
 
-                first_name = raw_input("First Name: ")
-                last_name = raw_input("Last_name: ")
-                dob = raw_input("Date Of Birth: ")
-                email = raw_input("Email: ")
-                phone_num = raw_input("Phone number: ")
-                address = raw_input("Address: ")
+                while True:
+                    first_name = raw_input("First Name: ")
+                    last_name = raw_input("Last_name: ")
+                    dob = raw_input("Date Of Birth: ")
+                    email = raw_input("Email: ")
+                    phone_num = raw_input("Phone number: ")
+                    address = raw_input("Address: ")
+                    if first_name != '' and last_name != '' \
+                            and dob != '' and email != '' and   \
+                            phone_num != '' and address != '':
+                        break
+                    else: print "Some fields are empty. Enter all the details:"
 
                 req_obj.reqType = 'INSERT'
                 req_obj.reqParams['client_type'] = self.cli_type
@@ -567,8 +632,14 @@ class ClientConnection(object):
         
         req_obj = Request()
 
-        self.usr = raw_input("Login Name: -> ")
-        self.pwd = raw_input("Password: -> ")
+        while True:
+            self.usr = raw_input("Login Name: -> ")
+            self.pwd = raw_input("Password: -> ")
+
+            if self.usr != '' and self.pwd != '':
+                break
+            else:
+                print"Error: Login / password empty"
 
         # create request object
         req_obj.reqType = 'LOGIN'
