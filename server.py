@@ -1,4 +1,5 @@
 import time
+import ssl
 import socket
 import threading
 import MySQLdb
@@ -7,6 +8,8 @@ import MySQLdb
 #REQUEST_TYPE_INQUIRY = "enquiry"
 AUTHENTICATION_FAILURE = "authentication_failed"
 AUTHENTICATION_SUCCESSFUL = "authentication_successfull"
+ssl_keyfile = "/home/kanti/kanti_sem_3/207/project/python_scripts/CMPE_project/ssl_key"
+ssl_certfile = "/home/kanti/kanti_sem_3/207/project/python_scripts/CMPE_project/ssl_cert"
 
 SUCCESS = 0
 ERROR = 1
@@ -20,12 +23,12 @@ class Response(object):
         s = "{}".format(self.resType)
         for k,v in self.resParams.items():
             s = "{}::{}:{}".format(s, k, v)
-        #print"Response sent ==> " + s
+        print"toString(): s =  " + s
         return s
 
 class Request(object):
     def __init__(self, buf):
-        #print "New Request ["+buf+"]"
+        print "New Request ["+buf+"]"
         values = buf.split('::')
         self.reqType = values[0]
         #print "Request Received ==> "+self.reqType
@@ -38,20 +41,25 @@ class Request(object):
 #########################  CLIENT THREAD CLASS #######################
 
 class Client(threading.Thread):
-    def __init__(self, sock, addr):
+    def __init__(self, ssock, addr):
         threading.Thread.__init__(self)
-        self.sock = sock
+        self.sock = ssock
         self.addr = addr
         self.db = MySQLdb.connect(host="127.0.0.1", user="root", passwd="vaibhav", db="Bank")
         self.cursor = self.db.cursor()
 
     def run(self):
-        #print"waiting for login info from the client.."
+        print"waiting for login info from the client.."
         while True:
             #receive login request from the client
-            data = self.sock.recv(1024)
-
+            try:
+                data = self.sock.recv(1024)
+                print data
+            except:
+                break
+            print"calling process_request()"
             result = self.process_request(data)
+            print"after process_request()"
             if(result == ERROR):
                 print "Error. Client connection closed."
                 break
@@ -102,30 +110,36 @@ class Client(threading.Thread):
                 self.send_error('LOGIN_RESPONSE','Invalid Username or password')
                 return ERROR
         else: 
-            sql = "SELECT * from customer_login WHERE USERNAME='{x}' AND PASSWORD='{y}'".format(x=req.reqParams["username"],y=req.reqParams["password"]) 
-            #print "sql query ==> " + sql
+            
+            sql = "SELECT * from customer_login WHERE USERNAME='{x}' AND PASSWORD=MD5('{y}')".format(x=req.reqParams["username"],y=req.reqParams["password"]) 
+            print "sql query ==> " + sql
             try:
                 self.cursor.execute(sql)
             except Exception as e:
                 print e
-                #print "calling auth failure server side error"
+                print "calling auth failure server side error"
                 self.send_error('LOGIN_RESPONSE', 'Server side error')
                 #self.sock.close()
                 return ERROR
-            
+        
+            print"db executed successfully"
+
             # fetch results (its a list)
             results = self.cursor.fetchone()
             if not results:
-                #print "calling auth failure user does not exist"
+                print "calling auth failure user does not exist"
                 self.send_error('LOGIN_RESPONSE','User does not exist')
                 return  ERROR
             else:
+                print"inside login else block"
                 #print results[0]+","+results[1]+","+str(results[2])+","+results[3]
                 resp.resType = 'LOGIN_RESPONSE'
                 resp.resParams['status']='SUCCESS'
                 resp.resParams['client_type']=results[3]
                 resp.resParams['client_id']=str(results[2])
+                print"before send"
                 self.sock.send(resp.toString())
+                print "after send"
                 return SUCCESS
 
     def service_get_request(self, req):
@@ -140,6 +154,12 @@ class Client(threading.Thread):
             self.get_customer_transactions(req)
         elif req.reqParams['subreq_type'] == 'CUSTOMER_PROFILE':
             self.get_customer_profile(req)
+        elif req.reqParams['subreq_type'] == 'ALL_TELLER_ID':
+            self.get_teller_ids(req)
+        elif req.reqParams['subreq_type'] == 'TELLER_PROFILE':
+            self.get_teller_profile(req)
+        elif req.reqParams['subreq_type'] == 'MONTH_TRANSACTIONS':
+            self.get_month_transactions(req)
         else:
             self.send_error('GET_RESPONSE','Invalid Sub request sent.')
             return ERROR
@@ -222,7 +242,8 @@ class Client(threading.Thread):
                 resp.resParams['DOB']=results[3]
                 resp.resParams['email']=results[4]
                 resp.resParams['phone']=results[5]
-                resp.resParams['address']=results[6]
+                resp.resParams['address']=str(results[6])+","+str(results[7])+","+str(results[8]) \
+                        +","+str(results[9])+","+str(results[10])+","+str(results[11])
                 self.sock.send(resp.toString())
                 return SUCCESS
 
@@ -376,6 +397,123 @@ class Client(threading.Thread):
             print results
             print "returning from get_transaction_record()"
             return results
+
+
+    def get_teller_ids(self, req):
+        print"Function: get_teller_ids()==>"
+        sql = "SELECT * FROM customer_login WHERE CLIENT_TYPE = \'Teller\'"
+        print "sql query ==> " + sql
+        try:
+            self.cursor.execute(sql)
+        except Exception as e:
+            print e
+            return ERROR
+
+        total_num = 0
+        resp = Response()
+        resp.resType = 'GET_RESPONSE'
+        resp.resParams['status']='SUCCESS'
+
+        # fetch results (its a list)
+        for row in self.cursor.fetchall():
+            total_num = total_num + 1
+            teller = 'teller'+str(total_num)
+            resp.resParams[teller] = str(row[0])+"/"+str(row[2])
+
+        print"total_num after loop = " + str(total_num)
+        resp.resParams['total_teller_num'] = total_num
+        
+        self.sock.send(resp.toString())
+        return SUCCESS
+
+
+    def get_teller_profile(self,req):
+
+        print "called get_teller_profile()"
+        if "teller_id" not in req.reqParams or \
+                req.reqParams["teller_id"] == "" :
+            self.send_error('GET_RESPONSE','Invalid Teller ID')
+            return ERROR
+        else: 
+            resp = Response()
+            sql = "SELECT * from TELLER_INFO_TABLE WHERE TELLER_ID='{x}'".format(x=req.reqParams["teller_id"]) 
+            print "sql query ==> " + sql
+            try:
+                self.cursor.execute(sql)
+            except Exception as e:
+                print e
+                self.send_error('GET_RESPONSE', 'Server error: DB operation failed.')
+                return ERROR
+
+            # fetch results (its a list)
+            results = self.cursor.fetchone()
+            if not results:
+                #print "get_teller_profile():Request failure-Record does not exist"
+                self.send_error('GET_RESPONSE','Record does not exist')
+                return ERROR
+            else:
+                #print str(results[0])+","+results[1]+","+results[2]+","+results[3]+ \
+                        #","+results[4]+","+results[5]+","+results[6]
+                
+                resp.resType = 'GET_RESPONSE'
+                resp.resParams['status']='SUCCESS'
+                resp.resParams['teller_id']=results[0]
+                resp.resParams['first_name']=results[1]
+                resp.resParams['last_name']=results[2]
+                resp.resParams['DOB']=results[3]
+                resp.resParams['email']=results[4]
+                resp.resParams['phone']=results[5]
+                resp.resParams['address']=str(results[6])+","+str(results[7])+","+str(results[8]) \
+                        +","+str(results[9])+","+str(results[10])+","+str(results[11])
+                self.sock.send(resp.toString())
+                return SUCCESS
+
+    def get_month_transactions(self, req):
+        # Form a list of transactions (Each transaction is a list)
+        # to send it to the client
+        transaction_list = []
+        print "called get_month_transactions()"
+        if "month" not in req.reqParams or \
+                req.reqParams["month"] == "" :
+            self.send_error('GET_RESPONSE','Invalid month field')
+            return ERROR
+        else: 
+            sql = "SELECT * FROM TRANSACTION_TABLE"
+            print"sql -> "+sql
+            try:
+                self.cursor.execute(sql)
+                for row in self.cursor.fetchall():
+                    print"Next Row = "+ str(row)
+                    dmonth, ddate, dyear=row[1].split('/')
+                    if req.reqParams["month"] == dmonth:
+                        #sql = "SELECT * FROM TRANSACTION_TABLE WHERE CUSTOMER_ID="+str(row[0])
+                        #print"sql -> "+sql
+                        #self.cursor.execute(sql)
+
+                        # fetch results (its a list)
+                        #results = self.cursor.fetchone()
+                        print"Above row matches criteria"
+                        temp_str = "CUSTOMER_ID-"+str(row[0])+" DATE-"+ \
+                                str(row[1])+" TIME-"+str(row[2])+" ACCOUNT-"+str(row[3]) \
+                                +" TRNSTYPE-"+str(row[4])+" AMOUNT-"+str(row[5]) + \
+                                " FROM_ACCT-"+str(row[6])+" TO_ACCT-"+str(row[7])
+                        print"temp_str = "+temp_str
+                        transaction_list.append(temp_str)
+                        print transaction_list
+
+            except Exception as e:
+                print e
+                self.send_error('GET_RESPONSE', 'Server error: DB operation failed.')
+                return ERROR
+
+            resp = Response()
+            resp.resType = 'GET_RESPONSE'
+            resp.resParams['status']='SUCCESS'
+            print "Transaction list = "
+            print transaction_list
+            resp.resParams['trns_list']=' '.join(transaction_list)
+            self.sock.send(resp.toString())
+            return SUCCESS
 
     #################################  UPDATE FUNCTIONS  ###############################
 
@@ -549,10 +687,10 @@ class Client(threading.Thread):
             self.send_error('INSERT_RESPONSE','Multiple Invalid key-value entries')
             return ERROR
         sql = "INSERT INTO customer_login(USERNAME,PASSWORD,CUSTOMER_ID,CLIENT_TYPE) \
-                VALUES('{a}','{b}','{c}','{d}')".format(a=req.reqParams['user_name'], \
+                VALUES('{a}',MD5('{b}'),'{c}','{d}')".format(a=req.reqParams['user_name'], \
                 b=req.reqParams['password'], c=req.reqParams['customer_id'], \
                 d = req.reqParams['record_client_type'])
-        #print "sql -> "+sql
+        
 
         try:
             self.cursor.execute(sql)
@@ -784,19 +922,33 @@ class Server(threading.Thread):
 
         # create new server socket and bind to host:port
         self.ssock = socket.socket(family)
-    #    self.ssock.setsockopt(socket.SOL_SOCKET, socket.IPV6_V6ONLY, 0)
         self.ssock.bind((self.ssock.getsockname()[0], port))
+        #self.ssock.settimeout(30)
         self.ssock.listen(5)
+#---------------------------------------------------------------------------------------------------
+        # To enable SSL uncomment ssl.wrap_socket() call
+        # Wrap Socket with SSL/TLS encryption function
+        # cert generated with openssl req -new -x509 -days 365 -nodes -out cert.pem -keyout cert.pem
+        self.sslSock = ssl.wrap_socket(self.ssock, \
+                ssl_version=ssl.PROTOCOL_TLSv1, server_side=True, certfile="./cert.pem")
+#---------------------------------------------------------------------------------------------------
+        
 
     def run(self):
         while True:
             print "Server Listening for Clients.."
 
             # c,addr is a <connected_socket , client_address> tuple
-            cliSock, cliAddr = self.ssock.accept()
-            print "=======>>>>>> New Client request accepted from: [" + str(cliAddr) + "]"
-
+#------------------------------------------------------
+            # To enable SSL uncomment this line
+	    cliSock, cliAddr = self.sslSock.accept()
+#------------------------------------------------------
+            # To disable SSL uncomment this line
+            #cliSock, cliAddr = self.ssock.accept()
+#------------------------------------------------------
+            print "======>>>>>>>>  New Client request accepted from: [" + str(cliAddr) + "]"
             cli = Client(cliSock, cliAddr)
+            cli.setDaemon(True)
             cli.start()
 
 
@@ -806,10 +958,11 @@ def main():
     port = 5500
 
     # Create DataBase object
-#    server = Server(socket.AF_INET, "0.0.0.0", port)
-#    server.start()
+    server = Server(socket.AF_INET, "0.0.0.0", port)
+    #server.start()
 
-    server = Server(socket.AF_INET6, "::", port)
+    #server = Server(socket.AF_INET6, "::", port)
+    server.setDaemon(True)
     server.start()
 
     while True:
