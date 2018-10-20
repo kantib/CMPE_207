@@ -1,0 +1,15 @@
+create database if not exists Bank;
+show databases;
+use Bank;
+create table customer_login (CUSTOMER_ID varchar(25), USERNAME varchar(25), PASSWORD varchar(50), SECURITY_QUES1 varchar(100), SECURITY_ANS1 varchar(100), SECURITY_QUES2 varchar(100), SECURITY_ANS2 varchar(100));
+describe customer_login;
+insert into customer_login values('123456', 'kanti', MD5('kanti'), 'what is your favorite game?', 'soccer', 'which country you are from?', 'India');
+select * from customer_login;
+create table account_table (CUSTOMER_ID varchar(25), CHECKING_ACCOUNT_NUM varchar(25), SAVING_ACCOUNT_NUM varchar(25), CHECKING_ACCOUNT_BAL int, SAVING_ACCOUNT_BAL int);
+insert into account_table values (123456, 333333, 444444, 300, 400);
+select * from account_table;
+create table customer_info_table (CUSTOMER_ID varchar(25), FIRST_NAME varchar(25), LAST_NAME varchar(25), DATE_OF_BIRTH varchar(25), EMAIL_ID varchar(25), ADDRESS varchar(50));
+insert into customer_info_table values('123456', 'kanti', 'bhat', '27Feb1988','kanti@rediffmail.com','654 N.First St. Sanjose CA 95777');
+select * from customer_info_table;
+create table transaction_table (CUSTOMER_ID varchar(25), DATE_OF_TXN varchar(25), TIME_OF_TXN varchar(25), FROM_ACCT_NUM varchar(25), TO_ACCT_NUM varchar(25), AMOUNT float, STATUS varchar(15));
+describe transaction_table;
